@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homework 4 - Welford and Sampling Variance</title>
+<meta name="description" content="Homework 4: derivation of Welford's recurrences for the sum of squares and the variance, and a simulation of the sampling mean and variance of m hackers attacking n systems.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Homework 4 · Statistics</div>
+    <h1><span>Welford's</span> recurrences and the<br>sampling mean and variance of <span>m hackers</span></h1>
+    <div class="meta">Student Name · November 2026 · the demos run in the browser, the tables come from my Python code</div>
+  </div>
+</header>
+
+<nav class="toc"><div class="wrap">
+  <a href="#derive">1.1 · Derivation</a>
+  <a href="#code1">1.2 · Code</a>
+  <a href="#stable">1.3 · Why bother</a>
+  <a href="#setup">2.1 · Setup</a>
+  <a href="#sim">2.2 · Simulator</a>
+  <a href="#compare">2.3 · Averages vs μ, σ²</a>
+  <a href="#spread">2.4 · Effect of n</a>
+  <a href="#concl">2.5 · Conclusions</a>
+  <a href="#code">Code</a>
+</div></nav>
+
+<main>
+
+<!-- ============================================================ EX 1 -->
+<section id="derive">
+  <h2><span class="num">1</span>Ex. 1 - Welford's recurrence formulas</h2>
+  <p class="lead">Updating the mean, the sum of squares and the variance one observation at a time.</p>
+
+  <p>We have a stream of observations <span class="math">x<sub>1</sub>, x<sub>2</sub>, …</span> and after the first k of them we want</p>
+  <p style="text-align:center"><span class="math">M<sub>k</sub> = (1/k) Σ<sub>i=1..k</sub> x<sub>i</sub>, &nbsp;&nbsp;
+  S<sub>k</sub> = Σ<sub>i=1..k</sub> (x<sub>i</sub> − M<sub>k</sub>)², &nbsp;&nbsp; s²<sub>k</sub> = S<sub>k</sub> / (k − 1)</span></p>
+  <p>without storing the old observations and without going through them again. S<sub>k</sub> is the sum of squared deviations (SS) and s²<sub>k</sub> is the
+  sample variance (with the k − 1 denominator).</p>
+
+  <h3>Step 0: Knuth's recurrence for the mean</h3>
+  <p>Since <span class="math">k·M<sub>k</sub> = (k − 1)·M<sub>k−1</sub> + x<sub>k</sub></span>, dividing by k:</p>
+  <p style="text-align:center"><span class="math">M<sub>k</sub> = M<sub>k−1</sub> + (x<sub>k</sub> − M<sub>k−1</sub>) / k</span></p>
+  <p>The idea is to never compute the big sum Σx<sub>i</sub>, but only a correction to the previous mean: the new point "pulls" the mean towards itself by
+  1/k of the distance. For the rest I call this distance</p>
+  <p style="text-align:center"><span class="math">δ<sub>k</sub> = x<sub>k</sub> − M<sub>k−1</sub></span>, &nbsp; so &nbsp; <span class="math">M<sub>k</sub> = M<sub>k−1</sub> + δ<sub>k</sub>/k</span></p>
+  <p>Two consequences that I use below:</p>
+  <ol class="steps">
+    <li><span class="math">x<sub>k</sub> − M<sub>k</sub> = δ<sub>k</sub> − δ<sub>k</sub>/k = δ<sub>k</sub>(k − 1)/k</span></li>
+    <li><span class="math">Σ<sub>i=1..k−1</sub> (x<sub>i</sub> − M<sub>k−1</sub>) = 0</span> (deviations from the mean always sum to zero)</li>
+  </ol>
+
+  <h3>Step 1: recurrence for the sum of squares S<sub>k</sub></h3>
+  <p>Same approach: write the new quantity in terms of the old one plus a correction. Split S<sub>k</sub> into the first k − 1 terms and the last one, and in the
+  first k − 1 terms replace <span class="math">M<sub>k</sub> = M<sub>k−1</sub> + δ<sub>k</sub>/k</span>:</p>
+  <div class="card mathblock">
+    <p><span class="math">S<sub>k</sub> = Σ<sub>i=1..k−1</sub> (x<sub>i</sub> − M<sub>k−1</sub> − δ<sub>k</sub>/k)² + (x<sub>k</sub> − M<sub>k</sub>)²</span></p>
+    <p><span class="math">&nbsp;&nbsp;&nbsp; = Σ<sub>i=1..k−1</sub> (x<sub>i</sub> − M<sub>k−1</sub>)² − (2δ<sub>k</sub>/k)·Σ<sub>i=1..k−1</sub> (x<sub>i</sub> − M<sub>k−1</sub>) + (k − 1)·δ<sub>k</sub>²/k² + δ<sub>k</sub>²(k − 1)²/k²</span></p>
+    <p><span class="math">&nbsp;&nbsp;&nbsp; = S<sub>k−1</sub> − 0 + δ<sub>k</sub>²·(k − 1)/k² · (1 + (k − 1))</span></p>
+    <p><span class="math">&nbsp;&nbsp;&nbsp; = S<sub>k−1</sub> + δ<sub>k</sub>²·(k − 1)/k</span></p>
+  </div>
+  <p>The middle term vanishes because of property 2, and the last term uses property 1. Finally, since <span class="math">δ<sub>k</sub>(k − 1)/k = x<sub>k</sub> − M<sub>k</sub></span>,
+  the correction can be written as a product of the "old" and the "new" deviation, which is the form usually called Welford's formula:</p>
+  <p style="text-align:center"><span class="math big">S<sub>k</sub> = S<sub>k−1</sub> + (x<sub>k</sub> − M<sub>k−1</sub>)(x<sub>k</sub> − M<sub>k</sub>)</span></p>
+  <p>with <span class="math">M<sub>0</sub> = 0, S<sub>0</sub> = 0</span>. For k = 1 it gives <span class="math">M<sub>1</sub> = x<sub>1</sub></span> and <span class="math">S<sub>1</sub> = 0</span>,
+  which is correct. Note that the correction is always ≥ 0 (it is δ²(k−1)/k), so S<sub>k</sub> can never decrease and can never become negative, not even with rounding errors.</p>
+
+  <details>
+    <summary>Check with the other route (Σx² form)</summary>
+    <p>Using <span class="math">S<sub>k</sub> = Σx<sub>i</sub>² − k·M<sub>k</sub>²</span>, we get
+    <span class="math">S<sub>k</sub> − S<sub>k−1</sub> = x<sub>k</sub>² − k M<sub>k</sub>² + (k − 1)M<sub>k−1</sub>²</span>. Substituting
+    <span class="math">x<sub>k</sub> = M + δ</span> and <span class="math">M<sub>k</sub> = M + δ/k</span> (with M = M<sub>k−1</sub>):</p>
+    <p style="text-align:center"><span class="math">M² + 2Mδ + δ² − kM² − 2Mδ − δ²/k + (k − 1)M² = δ² − δ²/k = δ²(k − 1)/k</span></p>
+    <p>Same result. (This route is fine on paper, but using Σx² in a program is exactly what goes wrong numerically, see 1.3.)</p>
+  </details>
+
+  <h3>Step 2: recurrence for the variance</h3>
+  <p>Dividing the SS recurrence by k − 1 (for k ≥ 2) and using <span class="math">S<sub>k−1</sub> = (k − 2)·s²<sub>k−1</sub></span>:</p>
+  <p style="text-align:center"><span class="math big">s²<sub>k</sub> = ((k − 2)/(k − 1))·s²<sub>k−1</sub> + (x<sub>k</sub> − M<sub>k−1</sub>)² / k</span></p>
+  <p>and for the "population" version with denominator k, <span class="math">σ̂²<sub>k</sub> = S<sub>k</sub>/k = ((k − 1)/k)·σ̂²<sub>k−1</sub> + (k − 1)(x<sub>k</sub> − M<sub>k−1</sub>)²/k²</span>.
+  In practice it's simpler to update S<sub>k</sub> and divide only when the variance is needed, so that's what the code does.</p>
+
+  <div class="card demo">
+    <span class="label">Step through it</span>
+    <label for="wf-data">Data (comma separated)</label>
+    <input id="wf-data" type="text" value="4, 7, 13, 16, 5.5, 9">
+    <div class="btns">
+      <button id="wf-step">Next observation</button>
+      <button id="wf-all" class="ghost">All at once</button>
+      <button id="wf-reset" class="ghost">Reset</button>
+      <button id="wf-rand" class="ghost small">Random scores</button>
+    </div>
+    <div class="table-wrap"><table id="wf-table"></table></div>
+    <div class="out" id="wf-check"></div>
+  </div>
+</section>
+
+<hr>
+
+<section id="code1">
+  <h2><span class="num">1.2</span>The code</h2>
+  <p class="lead">The core logic is three lines.</p>
+  <div class="two">
+    <div>
+      <div class="ctitle">Python</div>
+<pre class="code">mean, ss = 0.0, 0.0
+for k, x in enumerate(data, start=1):
+    <span class="hlc">d = x - mean</span>          # x_k - M_(k-1)
+    <span class="hlc">mean += d / k</span>         # Knuth
+    <span class="hlc">ss += d * (x - mean)</span>  # Welford
+
+var = ss / (k - 1)        # sample variance</pre>
+    </div>
+    <div>
+      <div class="ctitle">JavaScript (used on this page)</div>
+<pre class="code">function welfordUpdate(st, x) {
+  st.k += 1;
+  <span class="hlc">const d = x - st.mean;</span>
+  <span class="hlc">st.mean += d / st.k;</span>
+  <span class="hlc">st.ss += d * (x - st.mean);</span>
+}
+// variance = st.ss / (st.k - 1)</pre>
+    </div>
+  </div>
+  <p>Note that in the third line <span class="mono">mean</span> has already been updated, so <span class="mono">x - mean</span> is <span class="math">x<sub>k</sub> − M<sub>k</sub></span>
+  while <span class="mono">d</span> is still <span class="math">x<sub>k</sub> − M<sub>k−1</sub></span>. The order of the lines matters. I checked the function against
+  <span class="mono">numpy.var(ddof=1)</span> on 1,000 random numbers: the difference was 7·10⁻¹⁵, i.e. just rounding.</p>
+</section>
+
+<hr>
+
+<section id="stable">
+  <h2><span class="num">1.3</span>Why not just use Σx²?</h2>
+  <p class="lead">Numerical stability.</p>
+  <p>The one-pass formula from the textbook, <span class="math">s² = (Σx² − (Σx)²/n)/(n − 1)</span>, is correct mathematically but subtracts two huge numbers that are almost
+  equal. Doubles have about 16 significant digits, so if the data are large compared to their spread, the difference is lost in rounding. Welford never builds
+  these large sums: it only works with deviations from the current mean. The data below always have variance exactly 30 (it's 4, 7, 13, 16 plus a constant):</p>
+  <div class="card demo">
+    <span class="label">Try it</span>
+    <label for="cc-shift">Data = {4, 7, 13, 16} + 10^<b id="cc-sv" class="hl">0</b></label>
+    <input id="cc-shift" type="range" min="0" max="12" step="1" value="0">
+    <div class="table-wrap"><table id="cc-table"></table></div>
+  </div>
+  <p>With the shift at 10⁸ the naive formula already gives 29.33, at 10⁹ in my browser it gives a <b>negative</b> variance (−170.7), which is impossible, and at 10¹⁰ it
+  gives 21,845. Welford gives 30 every time. (In Python, at 10⁹ I got 0 instead of −170.7: recent versions of Python's <span class="mono">sum()</span> use compensated summation,
+  so the rounding is different, but it's still wrong.) The two-pass method (first the mean, then Σ(x − x̄)²) is also accurate, but it needs to go through the data twice.
+  Welford needs one pass and O(1) memory, which fits Ex. 2 well: each hacker's scores arrive one system at a time, and we can update its mean and variance immediately.</p>
+</section>
+
+<hr>
+
+<!-- ============================================================ EX 2 -->
+<section id="setup">
+  <h2><span class="num">2</span>Ex. 2 - Sampling mean and variance</h2>
+  <p class="lead">m hackers, n systems each, a score between 0 and 10 for every attempt.</p>
+
+  <h3>The setup</h3>
+  <p>Extending the previous homework, every penetration attempt now gets a score <span class="math">X ∈ [0, 10]</span> instead of just 0/1. Each of the
+  <span class="math">m</span> hackers attacks <span class="math">n</span> systems and gets a trajectory of n i.i.d. scores <span class="math">X<sub>1</sub>, …, X<sub>n</sub></span>.
+  For every hacker I run Welford's recurrences along its trajectory and at the end I have its sampling mean and sampling variance</p>
+  <p style="text-align:center"><span class="math">X̄<sub>n</sub> = M<sub>n</sub>, &nbsp;&nbsp; s²<sub>n</sub> = S<sub>n</sub>/(n − 1).</span></p>
+  <p>Then across the m hackers I take the average of the m sampling means and the average of the m sampling variances, and compare them with μ and σ².</p>
+
+  <h3>The distribution I chose: X = 10·Beta(2, 5)</h3>
+  <div class="two">
+    <div>
+      <p>I wanted something continuous, bounded in [0, 10] and <b>not symmetric</b>: most attempts get a low score (the system mostly holds), and a few go very well.
+      The Beta(2, 5) distribution has exactly this shape, and multiplying by 10 puts it on [0, 10]. Its density is</p>
+      <p style="text-align:center"><span class="math">f(x) = 30·(x/10)(1 − x/10)⁴ / 10, &nbsp; 0 ≤ x ≤ 10</span></p>
+      <p>From the Beta formulas (mean a/(a+b), variance ab/((a+b)²(a+b+1)), then ×10 and ×100):</p>
+      <p style="text-align:center"><span class="math big">μ = 20/7 ≈ 2.857, &nbsp; σ² = 125/49 ≈ 2.551</span></p>
+      <p style="font-size:15px;color:var(--muted)">To draw from it I used the fact that Beta(2, 5) is the distribution of the 2nd smallest of 6 independent uniform numbers,
+      so no special library is needed. In the simulator there are also three other distributions to compare with: Uniform(0, 10), Binomial(10, 0.3) (the score is the number of
+      successful steps out of 10, like 10 Bernoulli trials from the last homework) and 10·Beta(½, ½), which is U-shaped ("all or nothing").</p>
+    </div>
+    <div>
+      <div class="ctitle">density of the score, 10·Beta(2, 5)</div>
+      <canvas class="plot" id="pdf-chart"></canvas>
+      <div class="legend"><span><i style="background:var(--sky)"></i>density</span><span><i style="background:var(--orange)"></i>μ = 2.857</span><span><i style="background:#fff"></i>μ ± σ</span></div>
+    </div>
+  </div>
+
+  <h3>What theory predicts</h3>
+  <div class="table-wrap"><table>
+    <tr><th>Statistic of one hacker</th><th>Expected value</th><th>Standard deviation across hackers</th></tr>
+    <tr><td>sampling mean X̄<sub>n</sub></td><td>μ (unbiased)</td><td>σ/√n</td></tr>
+    <tr><td>sampling variance s²<sub>n</sub> (÷ n − 1)</td><td>σ² (unbiased)</td><td>√[(μ₄ − σ⁴(n − 3)/(n − 1))/n] ≈ σ²·√((κ − 1)/n)</td></tr>
+    <tr><td>"population" variance S<sub>n</sub>/n</td><td>σ²·(n − 1)/n (biased low)</td><td>(n − 1)/n times the above</td></tr>
+  </table></div>
+  <p>Here <span class="math">μ₄ = E[(X − μ)⁴]</span> is the fourth central moment and <span class="math">κ = μ₄/σ⁴</span> the kurtosis. For 10·Beta(2, 5),
+  <span class="math">μ₄ ≈ 18.74</span> and <span class="math">κ ≈ 2.88</span>. The reason E[s²] = σ² is the usual one: <span class="math">E[S<sub>n</sub>] = Σ E[(X<sub>i</sub> − μ)²] − n·E[(X̄ − μ)²] = nσ² − σ² = (n − 1)σ²</span>,
+  so we lose one "degree of freedom" because the deviations are measured from X̄ and not from μ.</p>
+</section>
+
+<hr>
+
+<section id="sim">
+  <h2><span class="num">2.2</span>Simulator</h2>
+  <p class="lead">Every hacker's mean and variance are computed with the three-line Welford update while its scores arrive.</p>
+  <div class="card demo">
+    <span class="label">Simulator</span>
+    <div class="row">
+      <div><label for="sim-dist">Score distribution</label>
+        <select id="sim-dist"><option value="beta25" selected>10·Beta(2, 5)</option><option value="uniform">Uniform(0, 10)</option><option value="binom">Binomial(10, 0.3)</option><option value="arcsine">10·Beta(½, ½)</option></select></div>
+      <div><label for="sim-n">n (systems per hacker)</label>
+        <select id="sim-n"><option>2</option><option>5</option><option selected>10</option><option>20</option><option>50</option><option>100</option><option>500</option><option>1000</option></select></div>
+      <div><label for="sim-m">m (hackers)</label>
+        <select id="sim-m"><option>20</option><option>200</option><option selected>2000</option><option>10000</option></select></div>
+      <div style="flex:0 0 auto"><div class="btns"><button id="sim-run">Simulate</button></div></div>
+    </div>
+    <div class="out" id="sim-status"></div>
+    <div class="table-wrap"><table id="sim-table"></table></div>
+
+    <h4>Running mean M<sub>k</sub> and running variance s²<sub>k</sub> of the first 20 hackers</h4>
+    <div class="two">
+      <div><div class="ctitle">M<sub>k</sub> (sampling mean after k systems)</div><canvas class="plot" id="tr-mean"></canvas></div>
+      <div><div class="ctitle">s²<sub>k</sub> (sampling variance after k systems)</div><canvas class="plot" id="tr-var"></canvas></div>
+    </div>
+    <div class="legend"><span><i style="background:var(--sky)"></i>hackers</span><span><i style="background:var(--orange)"></i>one hacker</span><span><i style="background:#fff"></i>μ or σ² (theory)</span></div>
+
+    <h4>Distribution over the m hackers at k = n</h4>
+    <div class="two">
+      <div><div class="ctitle">sampling means X̄<sub>n</sub></div><canvas class="plot" id="h-mean"></canvas>
+        <div class="legend"><span><i style="background:var(--sky)"></i>hackers</span><span><i style="background:var(--orange)"></i>N(μ, σ²/n)</span><span><i style="background:#fff"></i>μ</span></div></div>
+      <div><div class="ctitle">sampling variances s²<sub>n</sub></div><canvas class="plot" id="h-var"></canvas>
+        <div class="legend"><span><i style="background:var(--sky)"></i>hackers</span><span><i style="background:#fff"></i>σ²</span><span><i style="background:var(--orange)"></i>average of the s²</span></div></div>
+    </div>
+  </div>
+  <p><b>What the trajectories show.</b> Each line is one hacker: at the beginning its running mean and variance jump around a lot (after one system the mean is just the first
+  score), then they settle around μ and σ². The variance paths are much more "nervous" than the mean paths: a single high score (a lucky attack) makes the variance
+  jump up, and then it takes many systems to come back. With n = 2 or 5 the histogram of the variances is very skewed: many hackers have a variance below σ² and a few have a
+  very large one, but the average is still σ².</p>
+</section>
+
+<hr>
+
+<section id="compare">
+  <h2><span class="num">2.3</span>Average of the sampling means and variances vs μ and σ²</h2>
+  <p class="lead">m = 10,000 hackers for each n, X = 10·Beta(2, 5), μ = 2.8571, σ² = 2.5510 (Python).</p>
+  <div class="table-wrap"><table id="cmp-table"></table></div>
+  <p style="font-size:15px;color:var(--muted)">"z" is the difference from the theoretical value divided by the standard error of the average (sd across hackers / √m). If the estimator is unbiased,
+  z should behave like a standard normal, so values between about −2 and 2 are what we expect.</p>
+  <canvas class="plot tall" id="cmp-chart"></canvas>
+  <div class="legend"><span><i style="background:var(--orange)"></i>average of s² (÷ n−1) ± 2 SE</span><span><i style="background:var(--sky)"></i>average of S/n (÷ n)</span><span><i style="background:#fff"></i>σ² and σ²(n−1)/n</span></div>
+
+  <h3>What I conclude</h3>
+  <ul>
+    <li><b>The average of the sampling means matches μ for every n</b>, even n = 2. That is because <span class="math">E[X̄<sub>n</sub>] = μ</span> exactly, for any n:
+    X̄ is an unbiased estimator of μ. The small differences (third decimal) are Monte Carlo noise.</li>
+    <li><b>The average of the sampling variances matches σ² for every n too</b>, also n = 2, as long as we divide by n − 1. If we divide by n, the average is clearly too small,
+    and exactly by the factor (n − 1)/n: at n = 2 it was 1.229, about half of σ² = 2.551, at n = 10 it was 2.296 ≈ 0.9·σ². This is the reason for Bessel's correction.</li>
+    <li>Almost all the z values are within ±2. The exception is n = 2 where both the mean (z ≈ −2.8) and the variance (z ≈ −2.7) came out a bit low in the same run. I reran n = 2
+    with 8 other seeds and the z values were all between −2.3 and +1.6, so it's just an unlucky run. It also makes sense that the two came out low together: for a skewed
+    distribution X̄ and s² are not independent, <span class="math">Cov(X̄, s²) = μ₃/n</span>, and with this right-skewed score the correlation across hackers was about +0.29 at n = 2 and
+    0.43 for large n (theory for large n: 0.435). A hacker with a high average usually also has a high variance, because the high average comes from a few big scores.</li>
+    <li><b>Unbiased doesn't mean "usually right".</b> At n = 2, 69% of the hackers had s² below σ² and at n = 10 still 56%: the distribution of s² is skewed to the right, so the
+    typical (median) hacker underestimates the variance, and a few hackers overestimate it a lot, balancing the average. The mean of s² is right, the typical value is not.</li>
+  </ul>
+
+  <h3>Why this is useful in inferential statistics</h3>
+  <p>In real life we don't have 10,000 hackers, we have <b>one</b> sample of n observations and we don't know μ or σ². The simulation shows that X̄ and s² computed from that single
+  sample are "right on average", so they are reasonable estimates of the unknown parameters, and it shows how much they can be off (their standard deviation). This is the basis of:</p>
+  <ul>
+    <li><b>Point estimation:</b> X̄ for μ and s² for σ² are unbiased, and both are consistent (their spread goes to 0 as n grows, see 2.4).</li>
+    <li><b>Standard errors:</b> the precision of X̄ is σ/√n, and since σ is unknown we estimate it with s/√n. This only works because s² estimates σ² correctly.</li>
+    <li><b>Confidence intervals and tests:</b> the t-interval <span class="math">X̄ ± t<sub>0.975, n−1</sub>·s/√n</span> combines both estimators. I checked it in the simulation: the
+    fraction of hackers whose interval contained the true μ was 94.2% at n = 2, 93.3% at n = 5, 94.3% at n = 10 and 94.4-95.2% from n = 20 on. So it's close to 95% even though
+    the scores are not normal, and the small undercoverage at small n comes from the skewness.</li>
+    <li><b>Comparing hackers (or systems):</b> to decide if one hacker is really better than another we need to know how much X̄ varies just by chance. With n = 10 the
+    sampling means of identical hackers already range from about 1.9 to 3.9 (±2 sd), so a "ranking" of hackers based on 10 attempts would be mostly noise.</li>
+  </ul>
+</section>
+
+<hr>
+
+<section id="spread">
+  <h2><span class="num">2.4</span>Effect of n on the variability</h2>
+  <p class="lead">How much the sampling means and variances change from one hacker to another.</p>
+  <canvas class="plot tall" id="sd-chart"></canvas>
+  <div class="legend"><span><i style="background:var(--sky)"></i>sd of X̄ across hackers</span><span><i style="background:var(--orange)"></i>sd of s² across hackers</span><span>dots = simulation, dashed = theory (σ/√n and √[(μ₄ − σ⁴(n−3)/(n−1))/n])</span></div>
+  <div class="table-wrap"><table id="sd-table"></table></div>
+
+  <div class="card demo">
+    <span class="label">Try it</span>
+    <p style="margin-top:0">Same experiment in the browser, for all the n in the table, with the distribution chosen in the simulator above (<b id="sw-dist" class="hl"></b>).</p>
+    <div class="row">
+      <div><label for="sw-m">m (hackers per n)</label><select id="sw-m"><option>500</option><option selected>2000</option><option>5000</option></select></div>
+      <div style="flex:1 1 auto"><div class="btns"><button id="sw-run">Run for n = 2 … 1000</button><button id="sw-py" class="ghost">Show Python results</button></div></div>
+    </div>
+    <div class="out" id="sw-status">Showing the Python results (10·Beta(2, 5), m = 10,000).</div>
+  </div>
+
+  <ul>
+    <li><b>Both spreads go down like 1/√n.</b> On the log-log plot both are straight lines with slope −1/2: multiplying the number of systems by 100 divides the variability
+    by 10. For the means: sd 0.504 at n = 10, 0.051 at n = 1,000. For the variances: 1.17 at n = 10, 0.112 at n = 1,000. The simulation is on top of the theoretical curves.</li>
+    <li><b>The sampling variance is much noisier than the sampling mean</b>, relatively. At n = 10 the sd of X̄ is 18% of μ, while the sd of s² is 46% of σ². To estimate σ²
+    within ±10% (one sd) we need about n = 200 systems, while for μ the same relative precision is reached with about n = 30. In general sd(s²)/σ² ≈ √((κ − 1)/n), so it depends
+    on the kurtosis of the score distribution: in the simulator the U-shaped 10·Beta(½, ½) has κ = 1.5 and gives much more stable variances, while for a normal distribution
+    (κ = 3) it would be √(2/(n − 1)).</li>
+    <li><b>The averages over the m hackers are always accurate</b>, even for small n, because averaging over m hackers divides the spread again by √m. So increasing n makes
+    <i>each hacker's</i> estimates more reliable, and increasing m makes the <i>averages across hackers</i> more reliable. In practice, n is what matters if we want to say something
+    about a single hacker.</li>
+    <li><b>The shape changes too.</b> For small n the distribution of s² is very skewed (see the histogram in 2.2 with n = 2 or 5), and for large n both X̄ and s² become approximately
+    normal (CLT, as in the last homework), centred on μ and σ².</li>
+  </ul>
+</section>
+
+<hr>
+
+<section id="concl">
+  <h2><span class="num">2.5</span>Conclusions</h2>
+  <ul>
+    <li>Welford's recurrence <span class="math">S<sub>k</sub> = S<sub>k−1</sub> + (x<sub>k</sub> − M<sub>k−1</sub>)(x<sub>k</sub> − M<sub>k</sub>)</span> follows from Knuth's mean recurrence with
+    a few lines of algebra, needs three lines of code, one pass and constant memory, and doesn't suffer from the cancellation problem of the Σx² formula.</li>
+    <li>Across m = 10,000 simulated hackers, the average of the sampling means agreed with μ = 2.857 and the average of the sampling variances (÷ n − 1) agreed with σ² = 2.551 for
+    every n from 2 to 1,000, within Monte Carlo error. Dividing by n instead gives a bias of exactly −σ²/n.</li>
+    <li>This is what makes X̄ and s² usable as estimates of the unknown μ and σ² from a single sample, and it's the base of standard errors, t-intervals and tests.</li>
+    <li>More systems per hacker make each hacker's mean and variance less variable, both like 1/√n, but the variance estimate stays relatively noisier and more skewed, especially for
+    small n and heavy-tailed scores.</li>
+  </ul>
+</section>
+
+<hr>
+
+<section id="code">
+  <h2><span class="num">&lt;/&gt;</span>Code</h2>
+  <ul>
+    <li><a href="code/welford.py"><code>code/welford.py</code></a> - Python (numpy + scipy): Welford function, the numerical stability test, and the m = 10,000 hackers experiment
+    (Welford vectorized over the hackers, checked against numpy). Output in <a href="code/sim_output.txt"><code>code/sim_output.txt</code></a>.</li>
+    <li><a href="js/welford.js"><code>js/welford.js</code></a> - the recurrences, the four score distributions and the hacker simulation used by this page.</li>
+    <li><a href="js/charts.js"><code>js/charts.js</code></a> - the small plotting functions from the last homework.</li>
+    <li><a href="js/main.js"><code>js/main.js</code></a> - connects the page to the simulations.</li>
+  </ul>
+</section>
+
+</main>
+
+<footer>Homework 4 · Student Name · Statistics</footer>
+
+<script src="js/results.js"></script>
+<script src="js/welford.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

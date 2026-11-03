@@ -1,0 +1,21 @@
+=== Ex. 1 checks
+welford mean/var 5.042134439779396 4.251606635040499  numpy 5.042134439779402 4.251606635040506  diff 7.105427357601002e-15
+small example [4, 7, 13, 16] (10.0, 90.0, 30.0)
+shift    0e+00: welford 30.000000  naive 30.000000
+shift    1e+04: welford 30.000000  naive 30.000000
+shift    1e+06: welford 30.000000  naive 30.000000
+shift    1e+08: welford 30.000000  naive 29.333333
+shift    1e+09: welford 30.000000  naive 0.000000
+shift    1e+10: welford 30.000000  naive 21845.333333
+
+=== Ex. 2   X = 10*Beta(2,5)   mu = 2.85714   sigma^2 = 2.55102   mu4 = 18.74219
+n=    2  avg xbar=2.8258  avg s2=2.4585  avg s2(/n)=1.2292  sd xbar=1.1217 (th 1.1294)  sd s2=3.4197 (th 3.5532)  95% t-CI coverage=0.942  P(s2<sigma2)=0.691  corr(xbar,s2)=0.287
+n=    3  avg xbar=2.8636  avg s2=2.5268  avg s2(/n)=1.6846  sd xbar=0.9260 (th 0.9221)  sd s2=2.4842 (th 2.4995)  95% t-CI coverage=0.933  P(s2<sigma2)=0.630  corr(xbar,s2)=0.345
+n=    5  avg xbar=2.8543  avg s2=2.5484  avg s2(/n)=2.0387  sd xbar=0.7096 (th 0.7143)  sd s2=1.7521 (th 1.7600)  95% t-CI coverage=0.933  P(s2<sigma2)=0.588  corr(xbar,s2)=0.400
+n=   10  avg xbar=2.8627  avg s2=2.5514  avg s2(/n)=2.2963  sd xbar=0.5042 (th 0.5051)  sd s2=1.1728 (th 1.1696)  95% t-CI coverage=0.943  P(s2<sigma2)=0.555  corr(xbar,s2)=0.415
+n=   20  avg xbar=2.8520  avg s2=2.5475  avg s2(/n)=2.4201  sd xbar=0.3586 (th 0.3571)  sd s2=0.8001 (th 0.8037)  95% t-CI coverage=0.944  P(s2<sigma2)=0.538  corr(xbar,s2)=0.424
+n=   50  avg xbar=2.8544  avg s2=2.5545  avg s2(/n)=2.5035  sd xbar=0.2239 (th 0.2259)  sd s2=0.4973 (th 0.5000)  95% t-CI coverage=0.950  P(s2<sigma2)=0.517  corr(xbar,s2)=0.422
+n=  100  avg xbar=2.8590  avg s2=2.5520  avg s2(/n)=2.5265  sd xbar=0.1597 (th 0.1597)  sd s2=0.3561 (th 0.3517)  95% t-CI coverage=0.948  P(s2<sigma2)=0.510  corr(xbar,s2)=0.439
+n=  200  avg xbar=2.8573  avg s2=2.5506  avg s2(/n)=2.5378  sd xbar=0.1135 (th 0.1129)  sd s2=0.2487 (th 0.2480)  95% t-CI coverage=0.949  P(s2<sigma2)=0.512  corr(xbar,s2)=0.433
+n=  500  avg xbar=2.8580  avg s2=2.5534  avg s2(/n)=2.5483  sd xbar=0.0714 (th 0.0714)  sd s2=0.1578 (th 0.1566)  95% t-CI coverage=0.952  P(s2<sigma2)=0.503  corr(xbar,s2)=0.437
+n= 1000  avg xbar=2.8577  avg s2=2.5517  avg s2(/n)=2.5492  sd xbar=0.0508 (th 0.0505)  sd s2=0.1118 (th 0.1107)  95% t-CI coverage=0.948  P(s2<sigma2)=0.509  corr(xbar,s2)=0.435
